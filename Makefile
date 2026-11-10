@@ -3,7 +3,7 @@ VERSION  := 1.0.0
 BIN_DIR  := bin
 LDFLAGS  := -ldflags "-X github.com/nycon/qemu-cli/cmd.Version=$(VERSION)"
 
-.PHONY: build install clean test smoke tidy
+.PHONY: build install clean test smoke tidy release-binaries
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -14,6 +14,9 @@ install: build
 	install -m 755 $(BIN_DIR)/$(APP) $(HOME)/go/bin/$(APP)
 	install -m 755 $(BIN_DIR)/$(APP) $(HOME)/.local/bin/$(APP)
 	@echo "Installed to $(HOME)/go/bin/$(APP) and $(HOME)/.local/bin/$(APP)"
+
+release-binaries:
+	bash scripts/build-release.sh $(VERSION)
 
 tidy:
 	go mod tidy
@@ -29,4 +32,4 @@ smoke: build
 	@echo "smoke ok"
 
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) dist

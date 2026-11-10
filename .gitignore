@@ -1,5 +1,7 @@
 bin/
 dist/
+*.tar.gz
+*.zip
 *.exe
 *.test
 .DS_Store

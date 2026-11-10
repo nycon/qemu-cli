@@ -6,8 +6,34 @@ Manage VMs, snapshots, backups, tenants, and security from the terminal.
 
 ## Installation
 
+### Prebuilt binaries (recommended)
+
+Download the latest release for your OS from:
+
+**https://github.com/nycon/qemu-cli/releases**
+
+| Platform | Archive |
+|---|---|
+| macOS Apple Silicon | `qemu-cli_v*_darwin_arm64.tar.gz` |
+| macOS Intel | `qemu-cli_v*_darwin_amd64.tar.gz` |
+| Linux x86_64 | `qemu-cli_v*_linux_amd64.tar.gz` |
+| Linux ARM64 | `qemu-cli_v*_linux_arm64.tar.gz` |
+| Windows x86_64 | `qemu-cli_v*_windows_amd64.zip` |
+
+Example (macOS Apple Silicon):
+
 ```bash
-# Go 1.22+
+curl -fsSL -o qemu-cli.tar.gz \
+  https://github.com/nycon/qemu-cli/releases/latest/download/qemu-cli_v1.0.0_darwin_arm64.tar.gz
+tar -xzf qemu-cli.tar.gz
+chmod +x qemu-cli_v1.0.0_darwin_arm64
+sudo mv qemu-cli_v1.0.0_darwin_arm64 /usr/local/bin/qemu-cli
+qemu-cli version
+```
+
+### Build from source
+
+```bash
 git clone https://github.com/nycon/qemu-cli.git
 cd qemu-cli
 make install
