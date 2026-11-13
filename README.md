@@ -14,11 +14,11 @@ Download the latest release for your OS from:
 
 | Platform | Archive |
 |---|---|
-| macOS Apple Silicon | `qemu-cli_v*_darwin_arm64.tar.gz` |
-| macOS Intel | `qemu-cli_v*_darwin_amd64.tar.gz` |
-| Linux x86_64 | `qemu-cli_v*_linux_amd64.tar.gz` |
-| Linux ARM64 | `qemu-cli_v*_linux_arm64.tar.gz` |
-| Windows x86_64 | `qemu-cli_v*_windows_amd64.zip` |
+| macOS Apple Silicon | `qemu-cli_*_darwin_arm64.tar.gz` |
+| macOS Intel | `qemu-cli_*_darwin_amd64.tar.gz` |
+| Linux x86_64 | `qemu-cli_*_linux_amd64.tar.gz` |
+| Linux ARM64 | `qemu-cli_*_linux_arm64.tar.gz` |
+| Windows x86_64 | `qemu-cli_*_windows_amd64.zip` |
 
 Example (macOS Apple Silicon):
 
@@ -49,7 +49,7 @@ Ensure `$(go env GOPATH)/bin` (and optionally `~/.local/bin`) is on your `PATH`.
 
 ## Getting Started
 
-1. Create an API token in the panel: **Settings > API Keys > New API Key**
+1. Create an API token in the panel: **User Profile → API Keys → New API Key**
 2. Create a CLI context:
 
 ```bash
