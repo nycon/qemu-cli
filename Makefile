@@ -1,5 +1,5 @@
 APP      := qemu-cli
-VERSION  := 1.0.0
+VERSION  := 1.1.0
 BIN_DIR  := bin
 LDFLAGS  := -ldflags "-X github.com/nycon/qemu-cli/cmd.Version=$(VERSION)"
 
@@ -28,6 +28,9 @@ smoke: build
 	./$(BIN_DIR)/$(APP) --help >/dev/null
 	./$(BIN_DIR)/$(APP) context --help >/dev/null
 	./$(BIN_DIR)/$(APP) vm --help >/dev/null
+	./$(BIN_DIR)/$(APP) network --help >/dev/null
+	./$(BIN_DIR)/$(APP) ip-pool --help >/dev/null
+	./$(BIN_DIR)/$(APP) tenant --help >/dev/null
 	./$(BIN_DIR)/$(APP) version
 	@echo "smoke ok"
 

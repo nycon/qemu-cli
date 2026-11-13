@@ -98,31 +98,34 @@ func init() {
 }
 
 var (
-	vmImage         string
-	vmProject       string
-	vmIPPool        string
-	vmCPU           int
-	vmRAM           int
-	vmDisk          int
-	vmPassword      string
-	vmRandomPass    bool
-	vmSSHKey        string
-	vmHostname      string
-	vmStoragePool   string
-	vmDefaultUser   string
-	vmDescription   string
+	vmImage        string
+	vmProject      string
+	vmIPPool       string
+	vmIPAllocation string
+	vmPublicIP     string
+	vmCPU          int
+	vmRAM          int
+	vmDisk         int
+	vmPassword     string
+	vmRandomPass   bool
+	vmSSHKey       string
+	vmHostname     string
+	vmStoragePool  string
+	vmDefaultUser  string
+	vmDescription  string
 )
 
 var vmCreateCmd = &cobra.Command{
 	Use:   "create [name]",
 	Short: "Create a new VM from a cloud image",
 	Args:  cobra.ExactArgs(1),
-	Example: `  qemu-cli vm create web1 --image "Ubuntu 24.04" --project <uuid> --ip-pool <uuid> --random-password
+	Example: `  qemu-cli vm create web1 --image "Ubuntu 24.04" --project <uuid> --public-ip 159.69.172.28 --random-password
+  qemu-cli vm create web1 --image "Ubuntu 24.04" --project <uuid> --ip-pool <uuid> --ip-allocation <uuid>
   qemu-cli vm create db1 --image Debian --project <uuid> --ip-pool <uuid> --cpu 2 --ram 4096 --disk 40 --ssh-key "ssh-ed25519 AAAA..."`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		if vmImage == "" || vmProject == "" || vmIPPool == "" {
-			return fmt.Errorf("missing required flags\n  qemu-cli vm create %s --image <name|id> --project <uuid> --ip-pool <uuid>", name)
+		if vmImage == "" || vmProject == "" {
+			return fmt.Errorf("missing required flags\n  qemu-cli vm create %s --image <name|id> --project <uuid> --public-ip <ip>|--ip-pool <uuid>", name)
 		}
 		c, err := clientFromActive()
 		if err != nil {
@@ -132,6 +135,23 @@ var vmCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		poolID := vmIPPool
+		allocID := vmIPAllocation
+		if vmPublicIP != "" || allocID != "" {
+			resolvedPool, resolvedAlloc, err := resolvePublicIPSelection(c, tid, vmPublicIP, allocID)
+			if err != nil {
+				return err
+			}
+			if poolID == "" {
+				poolID = resolvedPool
+			}
+			allocID = resolvedAlloc
+		}
+		if poolID == "" {
+			return fmt.Errorf("missing network selection\n  qemu-cli vm create %s --image <name|id> --project <uuid> --public-ip <ip>\n  qemu-cli vm create %s --image <name|id> --project <uuid> --ip-pool <uuid>", name, name)
+		}
+
 		imageID, err := resolve.Image(c, vmImage)
 		if err != nil {
 			return err
@@ -177,13 +197,16 @@ var vmCreateCmd = &cobra.Command{
 			"vcpus":               vmCPU,
 			"ram_mb":              vmRAM,
 			"disk_size_gb":        vmDisk,
-			"ip_pool_id":          vmIPPool,
+			"ip_pool_id":          poolID,
 			"cloud_init_identity": identity,
 			"cloud_init_userdata": map[string]any{
 				"packages": []string{},
 				"runcmd":   []string{},
 				"timezone": "Europe/Berlin",
 			},
+		}
+		if allocID != "" {
+			payload["ip_allocation_id"] = allocID
 		}
 		if vmStoragePool != "" {
 			payload["storage_pool_id"] = vmStoragePool
@@ -207,7 +230,9 @@ var vmCreateCmd = &cobra.Command{
 func init() {
 	vmCreateCmd.Flags().StringVar(&vmImage, "image", "", "Cloud image ID or name (required)")
 	vmCreateCmd.Flags().StringVar(&vmProject, "project", "", "Project UUID (required)")
-	vmCreateCmd.Flags().StringVar(&vmIPPool, "ip-pool", "", "IP pool UUID (required)")
+	vmCreateCmd.Flags().StringVar(&vmIPPool, "ip-pool", "", "IP pool UUID (required unless --public-ip)")
+	vmCreateCmd.Flags().StringVar(&vmIPAllocation, "ip-allocation", "", "Reserved public IP allocation UUID")
+	vmCreateCmd.Flags().StringVar(&vmPublicIP, "public-ip", "", "Assigned public IP address (e.g. 159.69.172.28)")
 	vmCreateCmd.Flags().IntVar(&vmCPU, "cpu", 1, "vCPUs")
 	vmCreateCmd.Flags().IntVar(&vmRAM, "ram", 1024, "RAM in MB")
 	vmCreateCmd.Flags().IntVar(&vmDisk, "disk", 20, "Disk size in GB")
@@ -218,6 +243,39 @@ func init() {
 	vmCreateCmd.Flags().StringVar(&vmStoragePool, "storage-pool", "", "Storage pool UUID")
 	vmCreateCmd.Flags().StringVar(&vmDefaultUser, "user", "cloud", "Default cloud-init user")
 	vmCreateCmd.Flags().StringVar(&vmDescription, "description", "", "VM description")
+}
+
+func resolvePublicIPSelection(c *api.Client, tid, publicIP, allocationID string) (poolID, allocID string, err error) {
+	raw, err := c.Get("/tenants/"+tid+"/public-ips", nil)
+	if err != nil {
+		return "", "", err
+	}
+	items, err := api.AsList(raw)
+	if err != nil {
+		return "", "", err
+	}
+	publicIP = strings.TrimSpace(publicIP)
+	allocationID = strings.TrimSpace(allocationID)
+	for _, it := range items {
+		var a map[string]any
+		_ = api.Decode(it, &a)
+		id := fmt.Sprint(a["id"])
+		ip := fmt.Sprint(a["ip_address"])
+		status := fmt.Sprint(a["status"])
+		if status != "reserved" {
+			continue
+		}
+		if allocationID != "" && (id == allocationID || strings.HasPrefix(id, allocationID)) {
+			return fmt.Sprint(a["pool_id"]), id, nil
+		}
+		if publicIP != "" && ip == publicIP {
+			return fmt.Sprint(a["pool_id"]), id, nil
+		}
+	}
+	if publicIP != "" {
+		return "", "", fmt.Errorf("public IP %q not found as free/reserved for this tenant\n  qemu-cli tenant public-ips", publicIP)
+	}
+	return "", "", fmt.Errorf("public IP allocation %q not found as free/reserved for this tenant\n  qemu-cli tenant public-ips", allocationID)
 }
 
 var vmDescribeCmd = &cobra.Command{
@@ -294,22 +352,24 @@ func vmAction(action, idOrName, successMsg string) error {
 }
 
 var vmStartCmd = &cobra.Command{
-	Use:   "start [id|name]", Short: "Start a VM", Args: cobra.ExactArgs(1),
+	Use: "start [id|name]", Short: "Start a VM", Args: cobra.ExactArgs(1),
 	Example: `  qemu-cli vm start my-webserver`,
-	RunE: func(cmd *cobra.Command, args []string) error { return vmAction("start", args[0], "VM start initiated") },
+	RunE:    func(cmd *cobra.Command, args []string) error { return vmAction("start", args[0], "VM start initiated") },
 }
 var vmStopCmd = &cobra.Command{
-	Use:   "stop [id|name]", Short: "Gracefully stop a VM", Args: cobra.ExactArgs(1),
+	Use: "stop [id|name]", Short: "Gracefully stop a VM", Args: cobra.ExactArgs(1),
 	Example: `  qemu-cli vm stop my-webserver`,
-	RunE: func(cmd *cobra.Command, args []string) error { return vmAction("stop", args[0], "VM stop initiated") },
+	RunE:    func(cmd *cobra.Command, args []string) error { return vmAction("stop", args[0], "VM stop initiated") },
 }
 var vmRebootCmd = &cobra.Command{
-	Use:   "reboot [id|name]", Short: "Reboot a VM", Args: cobra.ExactArgs(1),
+	Use: "reboot [id|name]", Short: "Reboot a VM", Args: cobra.ExactArgs(1),
 	Example: `  qemu-cli vm reboot my-webserver`,
-	RunE: func(cmd *cobra.Command, args []string) error { return vmAction("reboot", args[0], "VM reboot initiated") },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return vmAction("reboot", args[0], "VM reboot initiated")
+	},
 }
 var vmPoweroffCmd = &cobra.Command{
-	Use:   "poweroff [id|name]", Short: "Force power-off a VM", Args: cobra.ExactArgs(1),
+	Use: "poweroff [id|name]", Short: "Force power-off a VM", Args: cobra.ExactArgs(1),
 	Example: `  qemu-cli vm poweroff my-webserver`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return vmAction("force_stop", args[0], "VM powered off")

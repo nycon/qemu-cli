@@ -2,7 +2,7 @@
 
 Official Go command-line interface for [QEMU Interface](https://github.com/nycon/qemu-wi) panels.
 
-Manage VMs, snapshots, backups, tenants, and security from the terminal.
+Manage VMs, snapshots, backups, tenants, networks, public IPs, and security from the terminal.
 
 ## Installation
 
@@ -24,10 +24,10 @@ Example (macOS Apple Silicon):
 
 ```bash
 curl -fsSL -o qemu-cli.tar.gz \
-  https://github.com/nycon/qemu-cli/releases/latest/download/qemu-cli_v1.0.0_darwin_arm64.tar.gz
+  https://github.com/nycon/qemu-cli/releases/latest/download/qemu-cli_1.1.0_darwin_arm64.tar.gz
 tar -xzf qemu-cli.tar.gz
-chmod +x qemu-cli_v1.0.0_darwin_arm64
-sudo mv qemu-cli_v1.0.0_darwin_arm64 /usr/local/bin/qemu-cli
+chmod +x qemu-cli_1.1.0_darwin_arm64
+sudo mv qemu-cli_1.1.0_darwin_arm64 /usr/local/bin/qemu-cli
 qemu-cli version
 ```
 
@@ -109,6 +109,18 @@ qemu-cli firewall log              View Fail2Ban log
 
 qemu-cli tenant list               List tenants
 qemu-cli tenant use <id|name>      Select active tenant
+qemu-cli tenant public-ips         List assigned public IPs
+qemu-cli tenant set-email <email>  Set notification email
+qemu-cli tenant assign-public-ips  Assign free public IPs (admin)
+
+qemu-cli network list              List NAT/Internal networks
+qemu-cli network create <name>     Create NAT or Internal network
+qemu-cli network update <id>       Update network settings
+qemu-cli network delete <id>       Delete a network
+
+qemu-cli ip-pool list              List IP pools
+qemu-cli ip-pool available         Free public IPs (admin)
+
 qemu-cli user list                 List users
 
 qemu-cli server-info               Show host CPU/RAM/Disk
@@ -145,12 +157,21 @@ qemu-cli vm start my-webserver
 ## Creating VMs
 
 ```bash
+# Public IP assigned to the tenant
 qemu-cli vm create my-webserver \
   --image "Ubuntu 24.04" \
   --project <project-id> \
-  --ip-pool <ip-pool-id> \
+  --public-ip 159.69.172.28 \
   --random-password
 
+# Or pick a reserved allocation UUID
+qemu-cli vm create my-webserver \
+  --image "Ubuntu 24.04" \
+  --project <project-id> \
+  --ip-allocation <uuid> \
+  --random-password
+
+# NAT / Internal network via IP pool
 qemu-cli vm create my-webserver \
   --image "Ubuntu 24.04" \
   --project <project-id> \
@@ -166,7 +187,9 @@ qemu-cli vm create my-webserver \
 |---|---|---|
 | `--image` | (required) | Cloud image ID or name |
 | `--project` | (required) | Project UUID |
-| `--ip-pool` | (required) | IP pool UUID |
+| `--ip-pool` | - | IP pool UUID (NAT/Internal or public pool) |
+| `--public-ip` | - | Assigned public IP (resolves pool + allocation) |
+| `--ip-allocation` | - | Reserved public IP allocation UUID |
 | `--cpu` | 1 | Number of vCPUs |
 | `--ram` | 1024 | RAM in MB |
 | `--disk` | 20 | Disk size in GB |
@@ -176,6 +199,20 @@ qemu-cli vm create my-webserver \
 | `--hostname` | - | Custom hostname |
 | `--user` | cloud | Default cloud-init user |
 | `--storage-pool` | - | Storage pool UUID |
+
+## Networks & public IPs
+
+```bash
+qemu-cli network create web-dmz --type nat
+qemu-cli network create db --type internal --network 10.42.0.0/24 --gateway 10.42.0.1
+qemu-cli network list
+qemu-cli network update <id> --dhcp=false
+
+qemu-cli tenant public-ips
+qemu-cli ip-pool available
+qemu-cli tenant assign-public-ips Default --allocation-id <uuid> --allocation-id <uuid>
+qemu-cli tenant set-email ops@example.com
+```
 
 ## Tenant isolation
 
